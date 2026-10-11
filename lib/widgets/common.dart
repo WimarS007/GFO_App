@@ -150,16 +150,22 @@ class NumberField extends StatelessWidget {
     this.prefix,
     this.suffix,
     this.hint,
+    this.controller,
+    this.onChanged,
   });
 
   final String label;
   final String? prefix;
   final String? suffix;
   final String? hint;
+  final TextEditingController? controller;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
+      onChanged: onChanged,
       keyboardType:
           const TextInputType.numberWithOptions(decimal: true, signed: true),
       decoration: InputDecoration(
@@ -205,11 +211,15 @@ class ResultTile extends StatelessWidget {
     required this.label,
     this.unit,
     this.value = '—',
+    this.detail,
   });
 
   final String label;
   final String? unit;
   final String value;
+
+  /// Texto pequeño opcional bajo el valor (p. ej. el valor del período anterior).
+  final String? detail;
 
   @override
   Widget build(BuildContext context) {
@@ -241,6 +251,11 @@ class ResultTile extends StatelessWidget {
                 ),
             ]),
           ),
+          if (detail != null) ...[
+            const SizedBox(height: 4),
+            Text(detail!,
+                style: t.bodySmall?.copyWith(color: cs.onPrimaryContainer)),
+          ],
         ],
       ),
     );

@@ -8,7 +8,10 @@ import '../estados/excel_importer.dart';
 import '../widgets/common.dart';
 
 class EstadosFinancierosScreen extends StatefulWidget {
-  const EstadosFinancierosScreen({super.key});
+  const EstadosFinancierosScreen({super.key, required this.controller});
+
+  /// Controlador compartido con otros módulos (p. ej. Análisis financiero).
+  final EstadosController controller;
 
   @override
   State<EstadosFinancierosScreen> createState() =>
@@ -16,7 +19,7 @@ class EstadosFinancierosScreen extends StatefulWidget {
 }
 
 class _EstadosFinancierosScreenState extends State<EstadosFinancierosScreen> {
-  final EstadosController _c = EstadosController();
+  EstadosController get _c => widget.controller;
   final _empresa = TextEditingController();
   final _anterior = TextEditingController();
   final _actual = TextEditingController();
@@ -27,7 +30,6 @@ class _EstadosFinancierosScreenState extends State<EstadosFinancierosScreen> {
     _empresa.dispose();
     _anterior.dispose();
     _actual.dispose();
-    _c.dispose();
     super.dispose();
   }
 
