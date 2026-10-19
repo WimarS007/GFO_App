@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/modules.dart';
+import '../estados/estados_controller.dart';
+import '../ia/ia_service.dart';
 import 'analisis_financiero_screen.dart';
 import 'apalancamiento_screen.dart';
 import 'cvu_screen.dart';
@@ -24,14 +26,24 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final List<Widget> _pages;
 
+  /// Datos compartidos entre módulos.
+  final EstadosController _estados = EstadosController();
+  final IaConfig _ia = const IaConfig();
+
+  @override
+  void dispose() {
+    _estados.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
     // Mismo orden que la lista `modules`
     _pages = [
       DashboardScreen(onOpen: _go),
-      const EstadosFinancierosScreen(),
-      const AnalisisFinancieroScreen(),
+      EstadosFinancierosScreen(controller: _estados),
+      AnalisisFinancieroScreen(estados: _estados, ia: _ia),
       const CvuScreen(),
       const ApalancamientoScreen(),
       const FlujoEfectivoScreen(),

@@ -12,7 +12,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return PageScaffold(
       title: 'Panel principal',
-      subtitle: 'Sistema de Análisis y Planeación Financiera',
+      subtitle: 'Sistema de Análisis y Planeación Financiera · IS2122',
       children: [
         SectionCard(
           title: 'Indicadores clave',
