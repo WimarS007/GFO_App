@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../core/indicadores_compartidos.dart';
 import '../core/modules.dart';
 import '../estados/estados_controller.dart';
+import '../flujo/flujo_controller.dart';
 import '../ia/ia_service.dart';
 import 'analisis_financiero_screen.dart';
 import 'apalancamiento_screen.dart';
@@ -28,11 +30,15 @@ class _AppShellState extends State<AppShell> {
 
   /// Datos compartidos entre módulos.
   final EstadosController _estados = EstadosController();
+  final IndicadoresCompartidos _indicadores = IndicadoresCompartidos();
+  final FlujoController _flujo = FlujoController();
   final IaConfig _ia = const IaConfig();
 
   @override
   void dispose() {
     _estados.dispose();
+    _indicadores.dispose();
+    _flujo.dispose();
     super.dispose();
   }
 
@@ -41,12 +47,16 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     // Mismo orden que la lista `modules`
     _pages = [
-      DashboardScreen(onOpen: _go),
+      DashboardScreen(
+        onOpen: _go,
+        estados: _estados,
+        indicadores: _indicadores,
+      ),
       EstadosFinancierosScreen(controller: _estados),
       AnalisisFinancieroScreen(estados: _estados, ia: _ia),
-      const CvuScreen(),
-      const ApalancamientoScreen(),
-      const FlujoEfectivoScreen(),
+      CvuScreen(estados: _estados, indicadores: _indicadores),
+      ApalancamientoScreen(estados: _estados, indicadores: _indicadores),
+      FlujoEfectivoScreen(estados: _estados, flujo: _flujo),
       const PlaneacionPresupuestosScreen(),
       const ProformaScreen(),
       const PresupuestoPersonalScreen(),

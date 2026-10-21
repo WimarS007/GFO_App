@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
 
+import '../core/indicadores_compartidos.dart';
 import '../cvu/cvu_calculos.dart';
 import '../cvu/cvu_grafica.dart';
+import '../estados/estados_controller.dart';
+import '../estados/estados_models.dart';
+import '../estados/fuente_estados.dart';
 import '../estados/montos.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
 import '../widgets/common.dart';
 
 /// Punto de equilibrio y relación costo-volumen-utilidad (C-V-U).
-/// Los datos se escriben en este módulo y los resultados se actualizan al instante.
+/// Puede trabajar con datos escritos aquí o tomados de los estados financieros.
 class CvuScreen extends StatefulWidget {
-  const CvuScreen({super.key});
+  const CvuScreen({
+    super.key,
+    required this.estados,
+    required this.indicadores,
+  });
+
+  final EstadosController estados;
+  final IndicadoresCompartidos indicadores;
 
   @override
   State<CvuScreen> createState() => _CvuScreenState();
@@ -29,10 +40,15 @@ class _CvuScreenState extends State<CvuScreen> {
   final _cambioCf = TextEditingController();
   final _cambioVolumen = TextEditingController();
 
+  // Conexión con los estados financieros
+  bool _usarEstados = false;
+  Periodo _periodo = Periodo.actual;
+
   // IA
   final IaConfig _iaConfig = const IaConfig();
   late final IaService _ia = IaService(_iaConfig);
   String? _textoIa;
+  String? _resumenIa; // datos con los que se generó _textoIa
   String? _errorIa;
   bool _cargandoIa = false;
 
@@ -48,7 +64,14 @@ class _CvuScreenState extends State<CvuScreen> {
       ];
 
   @override
+  void initState() {
+    super.initState();
+    widget.estados.addListener(_publicar);
+  }
+
+  @override
   void dispose() {
+    widget.estados.removeListener(_publicar);
     for (final c in _todos) {
       c.dispose();
     }
@@ -69,8 +92,22 @@ class _CvuScreenState extends State<CvuScreen> {
       _fraccion(_cambioCf) != 0 ||
       _fraccion(_cambioVolumen) != 0;
 
-  /// null mientras falte precio, costo variable o costos fijos.
+  /// null mientras falten datos.
+  /// Con estados: precio = ventas / unidades; costo variable unitario = costos
+  /// variables / unidades; costos fijos de los estados. Solo se escriben las unidades.
   DatosCvu? get _datos {
+    if (_usarEstados) {
+      final e = widget.estados;
+      final u = _valor(_unidades);
+      final ventas = e.ventasNetas(_periodo);
+      if (u == null || u <= 0 || ventas <= 0) return null;
+      return DatosCvu(
+        precio: ventas / u,
+        costoVariable: e.costosVariables(_periodo) / u,
+        costosFijos: e.costosFijosParaUaii(_periodo),
+        unidades: u,
+      );
+    }
     final p = _valor(_precio);
     final cv = _valor(_costoVariable);
     final cf = _valor(_costosFijos);
@@ -83,6 +120,16 @@ class _CvuScreenState extends State<CvuScreen> {
     );
   }
 
+  String get _mensajeSinDatos {
+    if (_usarEstados) {
+      if (widget.estados.ventasNetas(_periodo) <= 0) {
+        return 'Las ventas netas de ${widget.estados.etiqueta(_periodo)} están en cero. Ingresa el Estado de Resultados en el módulo Estados financieros.';
+      }
+      return 'Ingresa las unidades vendidas. El precio y el costo variable unitario se calculan con las ventas y los costos de los estados financieros.';
+    }
+    return 'Ingresa el precio de venta, el costo variable unitario y los costos fijos para calcular. Las unidades vendidas son opcionales (se usan para la utilidad y el margen de seguridad).';
+  }
+
   DatosCvu _datosEscenario(DatosCvu base) => base.conCambios(
         cambioPrecio: _fraccion(_cambioPrecio),
         cambioCostoVariable: _fraccion(_cambioCv),
@@ -90,11 +137,21 @@ class _CvuScreenState extends State<CvuScreen> {
         cambioVolumen: _fraccion(_cambioVolumen),
       );
 
-  /// Cualquier cambio en los campos invalida la interpretación anterior.
-  void _cambio() => setState(() {
-        _textoIa = null;
-        _errorIa = null;
-      });
+  ResultadoCvu? get _resultadoBase {
+    final d = _datos;
+    return (d != null && d.problema == null) ? ResultadoCvu(d) : null;
+  }
+
+  /// Publica el punto de equilibrio para el panel principal.
+  void _publicar() {
+    widget.indicadores
+        .publicarPuntoEquilibrio(_resultadoBase?.puntoEquilibrioUnidades);
+  }
+
+  void _cambio() {
+    setState(() => _errorIa = null);
+    _publicar();
+  }
 
   void _limpiar() {
     for (final c in _todos) {
@@ -103,10 +160,24 @@ class _CvuScreenState extends State<CvuScreen> {
     _cambio();
   }
 
+  String? _resumen(ResultadoCvu? base, ResultadoCvu? escenario) {
+    if (base == null) return null;
+    return resumenCvuParaIa(
+      base: base,
+      escenario: _hayCambios ? escenario : null,
+      cambioPrecio: _fraccion(_cambioPrecio),
+      cambioCostoVariable: _fraccion(_cambioCv),
+      cambioCostosFijos: _fraccion(_cambioCf),
+      cambioVolumen: _fraccion(_cambioVolumen),
+    );
+  }
+
   Future<void> _generarIa(ResultadoCvu? base, ResultadoCvu? escenario) async {
-    if (base == null) {
-      setState(() => _errorIa =
-          'Primero completa el precio, el costo variable y los costos fijos.');
+    final resumen = _resumen(base, escenario);
+    if (resumen == null) {
+      setState(() => _errorIa = _usarEstados
+          ? 'Primero ingresa las unidades vendidas y el Estado de Resultados.'
+          : 'Primero completa el precio, el costo variable y los costos fijos.');
       return;
     }
     setState(() {
@@ -116,17 +187,13 @@ class _CvuScreenState extends State<CvuScreen> {
     try {
       final texto = await _ia.interpretar(
         enfoque: 'Punto de equilibrio y relación costo-volumen-utilidad (C-V-U)',
-        resumen: resumenCvuParaIa(
-          base: base,
-          escenario: _hayCambios ? escenario : null,
-          cambioPrecio: _fraccion(_cambioPrecio),
-          cambioCostoVariable: _fraccion(_cambioCv),
-          cambioCostosFijos: _fraccion(_cambioCf),
-          cambioVolumen: _fraccion(_cambioVolumen),
-        ),
+        resumen: resumen,
       );
       if (!mounted) return;
-      setState(() => _textoIa = texto);
+      setState(() {
+        _textoIa = texto;
+        _resumenIa = resumen;
+      });
     } on IaException catch (e) {
       if (!mounted) return;
       setState(() => _errorIa = e.mensaje);
@@ -157,88 +224,154 @@ class _CvuScreenState extends State<CvuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final datos = _datos;
-    final problema = datos?.problema;
-    final base = (datos != null && problema == null) ? ResultadoCvu(datos) : null;
+    return ListenableBuilder(
+      listenable: widget.estados,
+      builder: (context, _) {
+        final datos = _datos;
+        final problema = datos?.problema;
+        final base =
+            (datos != null && problema == null) ? ResultadoCvu(datos) : null;
 
-    final datosEsc = datos == null ? null : _datosEscenario(datos);
-    final problemaEsc = datosEsc?.problema;
-    final escenario =
-        (base != null && datosEsc != null && problemaEsc == null)
-            ? ResultadoCvu(datosEsc)
-            : null;
+        final datosEsc = datos == null ? null : _datosEscenario(datos);
+        final problemaEsc = datosEsc?.problema;
+        final escenario =
+            (base != null && datosEsc != null && problemaEsc == null)
+                ? ResultadoCvu(datosEsc)
+                : null;
 
-    return PageScaffold(
-      title: 'Punto de equilibrio y C-V-U',
-      subtitle:
-          'Relación costo-volumen-utilidad: margen de contribución, punto de equilibrio y análisis de escenarios.',
-      children: [
-        _entrada(),
-        if (datos == null)
-          const InfoBox(
-            text:
-                'Ingresa el precio de venta, el costo variable unitario y los costos fijos para calcular. Las unidades vendidas son opcionales (se usan para la utilidad y el margen de seguridad).',
-          )
-        else if (problema != null)
-          InfoBox(icon: Icons.warning_amber_outlined, text: problema),
-        _resultados(base),
-        _grafica(base),
-        _escenarios(base, escenario, problemaEsc),
-        IaPanel(
-          config: _iaConfig,
-          onGenerar: () => _generarIa(base, escenario),
-          resultado: _textoIa,
-          error: _errorIa,
-          cargando: _cargandoIa,
-        ),
-      ],
+        // La interpretación se oculta si los datos cambiaron desde que se generó.
+        final textoVisible =
+            (_textoIa != null && _resumenIa == _resumen(base, escenario))
+                ? _textoIa
+                : null;
+
+        return PageScaffold(
+          title: 'Punto de equilibrio y C-V-U',
+          subtitle:
+              'Relación costo-volumen-utilidad: margen de contribución, punto de equilibrio y análisis de escenarios.',
+          children: [
+            _entrada(),
+            if (datos == null)
+              InfoBox(text: _mensajeSinDatos)
+            else if (problema != null)
+              InfoBox(icon: Icons.warning_amber_outlined, text: problema),
+            _resultados(base),
+            _grafica(base),
+            _escenarios(base, escenario, problemaEsc),
+            IaPanel(
+              config: _iaConfig,
+              onGenerar: () => _generarIa(base, escenario),
+              resultado: textoVisible,
+              error: _errorIa,
+              cargando: _cargandoIa,
+            ),
+          ],
+        );
+      },
     );
   }
 
   // ---------------------------------------------------------------- secciones
 
   Widget _entrada() {
+    final e = widget.estados;
+    final u = _valor(_unidades);
+    final ventas = e.ventasNetas(_periodo);
+
     return SectionCard(
       title: 'Datos de entrada',
       icon: Icons.edit_note,
       child: SpacedColumn(
         gap: 14,
         children: [
-          ResponsiveGrid(
-            minColumnWidth: 220,
-            children: [
-              NumberField(
-                label: 'Precio de venta unitario',
-                prefix: 'C\$ ',
-                controller: _precio,
-                onChanged: (_) => _cambio(),
-              ),
-              NumberField(
-                label: 'Costo variable unitario',
-                prefix: 'C\$ ',
-                controller: _costoVariable,
-                onChanged: (_) => _cambio(),
-              ),
-              NumberField(
-                label: 'Costos fijos totales',
-                prefix: 'C\$ ',
-                controller: _costosFijos,
-                onChanged: (_) => _cambio(),
-              ),
-              NumberField(
-                label: 'Unidades vendidas (opcional)',
-                suffix: 'unidades',
-                controller: _unidades,
-                onChanged: (_) => _cambio(),
-              ),
-            ],
+          FuenteEstados(
+            estados: e,
+            usar: _usarEstados,
+            onUsar: (v) {
+              setState(() => _usarEstados = v);
+              _cambio();
+            },
+            periodo: _periodo,
+            onPeriodo: (p) {
+              setState(() => _periodo = p);
+              _cambio();
+            },
+            descripcion:
+                'Las ventas y los costos salen del Estado de Resultados. Solo ingresas las unidades vendidas.',
           ),
+          if (_usarEstados)
+            ResponsiveGrid(
+              minColumnWidth: 220,
+              children: [
+                ValorDeEstados(
+                    label: 'Ventas netas (C\$)', valor: formatoMonto(ventas)),
+                ValorDeEstados(
+                  label: 'Costos variables totales (C\$)',
+                  valor: formatoMonto(e.costosVariables(_periodo)),
+                ),
+                ValorDeEstados(
+                  label: 'Costos fijos totales (C\$)',
+                  valor: formatoMonto(e.costosFijosParaUaii(_periodo)),
+                  ayuda: 'Incluye otros gastos − otros ingresos',
+                ),
+                NumberField(
+                  label: 'Unidades vendidas',
+                  suffix: 'unidades',
+                  controller: _unidades,
+                  onChanged: (_) => _cambio(),
+                ),
+                ValorDeEstados(
+                  label: 'Precio unitario calculado (C\$)',
+                  valor: (u != null && u > 0 && ventas > 0)
+                      ? formatoMonto(ventas / u)
+                      : '—',
+                  ayuda: 'Ventas / Unidades',
+                ),
+                ValorDeEstados(
+                  label: 'Costo variable unitario calculado (C\$)',
+                  valor: (u != null && u > 0)
+                      ? formatoMonto(e.costosVariables(_periodo) / u)
+                      : '—',
+                  ayuda: 'Costos variables / Unidades',
+                ),
+              ],
+            )
+          else
+            ResponsiveGrid(
+              minColumnWidth: 220,
+              children: [
+                NumberField(
+                  label: 'Precio de venta unitario',
+                  prefix: 'C\$ ',
+                  controller: _precio,
+                  onChanged: (_) => _cambio(),
+                ),
+                NumberField(
+                  label: 'Costo variable unitario',
+                  prefix: 'C\$ ',
+                  controller: _costoVariable,
+                  onChanged: (_) => _cambio(),
+                ),
+                NumberField(
+                  label: 'Costos fijos totales',
+                  prefix: 'C\$ ',
+                  controller: _costosFijos,
+                  onChanged: (_) => _cambio(),
+                ),
+                NumberField(
+                  label: 'Unidades vendidas (opcional)',
+                  suffix: 'unidades',
+                  controller: _unidades,
+                  onChanged: (_) => _cambio(),
+                ),
+              ],
+            ),
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
               onPressed: _limpiar,
               icon: const Icon(Icons.refresh),
-              label: const Text('Limpiar todo'),
+              label: const Text('Limpiar campos'),
             ),
           ),
         ],
@@ -352,7 +485,8 @@ class _CvuScreenState extends State<CvuScreen> {
     return SectionCard(
       title: 'Gráfica del punto de equilibrio',
       icon: Icons.show_chart,
-      subtitle: 'Se cruzan los ingresos totales y los costos totales en el punto de equilibrio.',
+      subtitle:
+          'Se cruzan los ingresos totales y los costos totales en el punto de equilibrio.',
       child: r == null
           ? const SizedBox(
               height: 120,
@@ -405,7 +539,8 @@ class _CvuScreenState extends State<CvuScreen> {
           ),
           if (base == null)
             const InfoBox(
-              text: 'Completa los datos de entrada para comparar el escenario con la situación base.',
+              text:
+                  'Completa los datos de entrada para comparar el escenario con la situación base.',
             )
           else if (problemaEsc != null)
             InfoBox(
