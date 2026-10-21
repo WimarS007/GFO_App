@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../core/indicadores_compartidos.dart';
 import '../core/modules.dart';
+import '../core/tema.dart';
 import '../estados/estados_controller.dart';
 import '../flujo/flujo_controller.dart';
 import '../ia/ia_service.dart';
+import 'acerca_de.dart';
 import 'analisis_financiero_screen.dart';
 import 'apalancamiento_screen.dart';
 import 'cvu_screen.dart';
@@ -66,6 +68,8 @@ class _AppShellState extends State<AppShell> {
 
   void _go(int i) => setState(() => _index = i);
 
+  void _acercaDe() => mostrarAcercaDe(context);
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
@@ -78,7 +82,12 @@ class _AppShellState extends State<AppShell> {
             children: [
               SizedBox(
                 width: 280,
-                child: _SideMenu(selected: _index, onSelect: _go),
+                child: _SideMenu(
+                  selected: _index,
+                  onSelect: _go,
+                  onAbout: _acercaDe,
+                  wide: true,
+                ),
               ),
               const VerticalDivider(width: 1),
               Expanded(child: body),
@@ -88,13 +97,20 @@ class _AppShellState extends State<AppShell> {
       }
 
       return Scaffold(
-        appBar: AppBar(title: Text(modules[_index].title)),
+        appBar: AppBar(
+          title: Text(modules[_index].title),
+          actions: const [BotonTema()],
+        ),
         drawer: Drawer(
           child: _SideMenu(
             selected: _index,
             onSelect: (i) {
               Navigator.of(context).pop();
               _go(i);
+            },
+            onAbout: () {
+              Navigator.of(context).pop();
+              _acercaDe();
             },
           ),
         ),
@@ -105,10 +121,18 @@ class _AppShellState extends State<AppShell> {
 }
 
 class _SideMenu extends StatelessWidget {
-  const _SideMenu({required this.selected, required this.onSelect});
+  const _SideMenu({
+    required this.selected,
+    required this.onSelect,
+    required this.onAbout,
+    this.wide = false,
+  });
 
+  /// En pantallas anchas el botón de tema va en el menú (no hay AppBar).
+  final bool wide;
   final int selected;
   final ValueChanged<int> onSelect;
+  final VoidCallback onAbout;
 
   @override
   Widget build(BuildContext context) {
@@ -136,6 +160,7 @@ class _SideMenu extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (wide) const BotonTema(),
               ],
             ),
           ),
@@ -160,6 +185,18 @@ class _SideMenu extends StatelessWidget {
               onTap: () => onSelect(i),
             ),
           ],
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Divider(height: 1),
+          ),
+          ListTile(
+            dense: true,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Acerca de'),
+            onTap: onAbout,
+          ),
         ],
       ),
     );
