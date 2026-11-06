@@ -48,7 +48,7 @@ class _AcercaDeDialog extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'despues programo esta onda',
+                'GFO App reúne en un solo lugar las herramientas de la asignatura Gestión Financiera Operativa. Permite ingresar o importar estados financieros y obtener análisis horizontal y vertical, razones financieras, punto de equilibrio, apalancamiento, flujo de efectivo y presupuestos. Incluye además presupuesto personal, control de inventario y exportación de reportes a PDF o Excel.',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),

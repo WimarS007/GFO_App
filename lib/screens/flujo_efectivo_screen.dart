@@ -8,6 +8,7 @@ import '../flujo/flujo_controller.dart';
 import '../flujo/flujo_widgets.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
+import '../ia/interpretacion_local.dart';
 import '../widgets/common.dart';
 
 /// Flujo de efectivo (método directo): entradas y salidas del período actual
@@ -128,6 +129,7 @@ class _FlujoEfectivoScreenState extends State<FlujoEfectivoScreen> {
               resultado: textoVisible,
               error: _errorIa,
               cargando: _cargandoIa,
+              interpretacionLocal: () => InterpretacionLocal.flujo(f, e),
             ),
           ],
         );

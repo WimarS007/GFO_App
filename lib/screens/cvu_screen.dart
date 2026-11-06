@@ -9,6 +9,7 @@ import '../estados/fuente_estados.dart';
 import '../estados/montos.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
+import '../ia/interpretacion_local.dart';
 import '../widgets/common.dart';
 
 /// Punto de equilibrio y relación costo-volumen-utilidad (C-V-U).
@@ -264,6 +265,10 @@ class _CvuScreenState extends State<CvuScreen> {
               resultado: textoVisible,
               error: _errorIa,
               cargando: _cargandoIa,
+              interpretacionLocal: base == null
+                  ? null
+                  : () => InterpretacionLocal.cvu(base,
+                      escenario: _hayCambios ? escenario : null),
             ),
           ],
         );

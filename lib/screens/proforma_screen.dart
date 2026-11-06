@@ -7,6 +7,7 @@ import '../estados/estados_models.dart';
 import '../estados/montos.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
+import '../ia/interpretacion_local.dart';
 import '../proforma/proforma_calculos.dart';
 import '../proforma/proforma_widgets.dart';
 import '../widgets/common.dart';
@@ -202,6 +203,7 @@ class _ProformaScreenState extends State<ProformaScreen> {
                 resultado: textoVisible,
                 error: _errorIa,
                 cargando: _cargandoIa,
+                interpretacionLocal: () => InterpretacionLocal.proforma(r),
               ),
             ],
             _conclusionCard(r),

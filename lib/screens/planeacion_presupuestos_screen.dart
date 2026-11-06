@@ -6,6 +6,7 @@ import '../estados/fuente_estados.dart';
 import '../estados/montos.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
+import '../ia/interpretacion_local.dart';
 import '../presupuestos/presupuestos_controller.dart';
 import '../presupuestos/presupuestos_widgets.dart';
 import '../widgets/common.dart';
@@ -170,6 +171,7 @@ class _PlaneacionPresupuestosScreenState
               resultado: textoVisible,
               error: _errorIa,
               cargando: _cargandoIa,
+              interpretacionLocal: () => InterpretacionLocal.presupuestos(widget.presupuestos),
             ),
           ],
         );

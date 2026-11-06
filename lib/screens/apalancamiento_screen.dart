@@ -8,6 +8,7 @@ import '../estados/fuente_estados.dart';
 import '../estados/montos.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
+import '../ia/interpretacion_local.dart';
 import '../widgets/common.dart';
 
 /// Grado de apalancamiento operativo (GAO), financiero (GAF) y total (GAT).
@@ -218,6 +219,7 @@ class _ApalancamientoScreenState extends State<ApalancamientoScreen> {
               resultado: textoVisible,
               error: _errorIa,
               cargando: _cargandoIa,
+              interpretacionLocal: r == null ? null : () => InterpretacionLocal.apalancamiento(r),
             ),
           ],
         );

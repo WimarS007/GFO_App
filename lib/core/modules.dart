@@ -80,4 +80,10 @@ const modules = <ModuleInfo>[
     group: 'Complementarios',
     complementary: true,
   ),
+  ModuleInfo(
+    title: 'Generar reporte',
+    description: 'Exporta los resultados de los módulos a PDF o Excel.',
+    icon: Icons.file_download_outlined,
+    group: 'Herramientas',
+  ),
 ];

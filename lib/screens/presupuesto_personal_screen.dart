@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../estados/montos.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
+import '../ia/interpretacion_local.dart';
 import '../personal/personal_controller.dart';
 import '../personal/personal_importer.dart';
 import '../personal/personal_models.dart';
@@ -881,6 +882,7 @@ class _PresupuestoPersonalScreenState extends State<PresupuestoPersonalScreen> {
           resultado: textoIa,
           error: _errorIa,
           cargando: _cargandoIa,
+          interpretacionLocal: () => InterpretacionLocal.personal(_p),
           puedeGenerar: true,
         ),
       ],

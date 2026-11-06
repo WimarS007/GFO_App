@@ -6,6 +6,7 @@ import '../estados/estados_models.dart';
 import '../estados/montos.dart';
 import '../ia/ia_service.dart';
 import '../ia/ia_widgets.dart';
+import '../ia/interpretacion_local.dart';
 import '../widgets/common.dart';
 
 /// Análisis horizontal, vertical, razones y DuPont.
@@ -70,6 +71,9 @@ class _AnalisisFinancieroScreenState extends State<AnalisisFinancieroScreen> {
         config: widget.ia,
         puedeGenerar: _a.hayDatos,
         cargando: _cargando.contains(alcance),
+        interpretacionLocal: _a.hayDatos
+            ? () => InterpretacionLocal.analisis(_a, alcance)
+            : null,
         resultado: _resultados[alcance],
         error: _errores[alcance],
         onGenerar: () => _generar(alcance),

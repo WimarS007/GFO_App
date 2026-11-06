@@ -9,6 +9,7 @@ import '../ia/ia_service.dart';
 import '../inventario/inventario_controller.dart';
 import '../personal/personal_controller.dart';
 import '../presupuestos/presupuestos_controller.dart';
+import '../reportes/reporte_builder.dart';
 import 'acerca_de.dart';
 import 'analisis_financiero_screen.dart';
 import 'apalancamiento_screen.dart';
@@ -20,6 +21,7 @@ import 'inventario_screen.dart';
 import 'planeacion_presupuestos_screen.dart';
 import 'presupuesto_personal_screen.dart';
 import 'proforma_screen.dart';
+import 'reportes_screen.dart';
 
 /// Contenedor principal: menú lateral (pantallas anchas) o drawer (móvil).
 class AppShell extends StatefulWidget {
@@ -79,6 +81,15 @@ class _AppShellState extends State<AppShell> {
       ProformaScreen(estados: _estados, indicadores: _indicadores),
       PresupuestoPersonalScreen(personal: _personal),
       InventarioScreen(inventario: _inventario),
+      ReportesScreen(
+        constructor: ConstructorReporte(
+          estados: _estados,
+          flujo: _flujo,
+          presupuestos: _presupuestos,
+          personal: _personal,
+          inventario: _inventario,
+        ),
+      ),
     ];
   }
 
