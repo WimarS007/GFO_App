@@ -18,6 +18,7 @@ class CuentaRow extends StatefulWidget {
     required this.onDelete,
     required this.onMove,
     this.autofocus = false,
+    this.mostrarComportamiento = false,
   });
 
   final Cuenta cuenta;
@@ -28,6 +29,9 @@ class CuentaRow extends StatefulWidget {
   final VoidCallback onDelete;
   final ValueChanged<Grupo> onMove;
   final bool autofocus;
+
+  /// Muestra el selector Variable / Fijo (costo de ventas y gastos de operación).
+  final bool mostrarComportamiento;
 
   @override
   State<CuentaRow> createState() => _CuentaRowState();
@@ -118,8 +122,47 @@ class _CuentaRowState extends State<CuentaRow> {
     );
   }
 
+  Widget _selectorComportamiento() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text('Comportamiento del costo:',
+              style: Theme.of(context).textTheme.bodySmall),
+          SegmentedButton<Comportamiento>(
+            showSelectedIcon: false,
+            style: const ButtonStyle(visualDensity: VisualDensity.compact),
+            segments: const [
+              ButtonSegment(
+                  value: Comportamiento.variable, label: Text('Variable')),
+              ButtonSegment(value: Comportamiento.fijo, label: Text('Fijo')),
+            ],
+            selected: {widget.cuenta.comportamiento},
+            onSelectionChanged: (s) {
+              setState(() => widget.cuenta.comportamiento = s.first);
+              widget.onChanged();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _filaPrincipal(),
+        if (widget.mostrarComportamiento) _selectorComportamiento(),
+      ],
+    );
+  }
+
+  Widget _filaPrincipal() {
     return LayoutBuilder(builder: (context, constraints) {
       final anterior =
           _campoMonto(Periodo.anterior, _anterior, widget.etiquetaAnterior);
@@ -173,9 +216,14 @@ class GrupoSection extends StatelessWidget {
     final destinos = Grupo.deEstado(grupo.estado);
     final etAnt = controller.etiqueta(Periodo.anterior);
     final etAct = controller.etiqueta(Periodo.actual);
+    final esCosto =
+        grupo == Grupo.costoVentas || grupo == Grupo.gastosOperacion;
 
     return SectionCard(
       title: grupo.titulo,
+      subtitle: esCosto
+          ? 'Marca cada cuenta como variable o fija: se usa en Punto de equilibrio y Apalancamiento.'
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -197,6 +245,7 @@ class GrupoSection extends StatelessWidget {
                 etiquetaAnterior: etAnt,
                 etiquetaActual: etAct,
                 autofocus: c.id == controller.ultimoAgregadoId && c.nombre.isEmpty,
+                mostrarComportamiento: esCosto,
                 onChanged: controller.notificarCambio,
                 onDelete: () => controller.eliminar(c.id),
                 onMove: (g) => controller.mover(c.id, g),

@@ -2,6 +2,10 @@ enum Estado { balance, resultados }
 
 enum Periodo { anterior, actual }
 
+/// Cómo se comporta un costo respecto al volumen de ventas.
+/// Lo usan los módulos de punto de equilibrio (C-V-U) y apalancamiento.
+enum Comportamiento { variable, fijo }
+
 /// Grupo (clasificación) al que pertenece cada cuenta.
 /// La clasificación permite que otros módulos usen los datos
 /// (activos corrientes, UAII, utilidad neta, etc.).
@@ -42,6 +46,16 @@ class Cuenta {
   Grupo grupo;
   double anterior;
   double actual;
+
+  Comportamiento? _comportamiento;
+
+  /// Si el usuario no lo marca: el costo de ventas es variable y los gastos de
+  /// operación son fijos. Solo importa para esos dos grupos.
+  Comportamiento get comportamiento =>
+      _comportamiento ??
+      (grupo == Grupo.costoVentas ? Comportamiento.variable : Comportamiento.fijo);
+
+  set comportamiento(Comportamiento v) => _comportamiento = v;
 
   double valor(Periodo p) => p == Periodo.anterior ? anterior : actual;
 

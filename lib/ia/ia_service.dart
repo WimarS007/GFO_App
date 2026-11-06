@@ -1,28 +1,30 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 
+import 'ia_proveedores.dart';
 import 'ia_secrets.dart';
 
-/// Configuración de la conexión con la IA (API de Google Gemini).
-/// La clave se toma de [IaSecrets] (o de --dart-define=GEMINI_API_KEY).
+export 'ia_proveedores.dart' show IaProveedorConfig, IaTipo;
+
+/// Configuración de la IA: lista de proveedores en orden de prioridad,
+/// tomada de [IaSecrets.proveedores].
+///
+/// Si esa lista no tiene ninguna clave, se intenta con
+/// --dart-define=GEMINI_API_KEY=tu_clave (solo Gemini).
 class IaConfig {
   const IaConfig();
 
-  static const modeloPredeterminado = 'gemini-flash-latest';
+  List<IaProveedorConfig> get proveedores {
+    final lista = IaSecrets.proveedores.where((p) => p.activo).toList();
+    if (lista.isNotEmpty) return lista;
 
-  String get apiKey {
     const deEntorno = String.fromEnvironment('GEMINI_API_KEY');
-    return (deEntorno.isNotEmpty ? deEntorno : IaSecrets.geminiApiKey).trim();
+    if (deEntorno.trim().isNotEmpty) {
+      return [const IaProveedorConfig.gemini(deEntorno)];
+    }
+    return const [];
   }
 
-  String get modelo => const String.fromEnvironment(
-        'GEMINI_MODEL',
-        defaultValue: modeloPredeterminado,
-      );
-
-  bool get configurada => apiKey.isNotEmpty;
+  bool get configurada => proveedores.isNotEmpty;
 }
 
 class IaException implements Exception {
@@ -33,89 +35,27 @@ class IaException implements Exception {
   String toString() => mensaje;
 }
 
-/// Cliente mínimo de la API de Google Gemini (generateContent).
+/// Pide texto a la IA probando varios proveedores en orden: si uno falla,
+/// continúa con el siguiente hasta que alguno responda.
 class IaService {
   IaService(this.config, {http.Client? cliente})
-      : _http = cliente ?? http.Client();
+      : _http = cliente ?? http.Client() {
+    _proveedores = [
+      for (final c in config.proveedores) IaProveedor.crear(c, _http),
+    ];
+  }
 
   final IaConfig config;
   final http.Client _http;
+  late final List<IaProveedor> _proveedores;
 
-  static Uri _url(String modelo) => Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/${Uri.encodeComponent(modelo)}:generateContent');
+  /// Nombre del proveedor que respondió la última vez (p. ej. "Groq").
+  String? ultimoProveedor;
 
-  /// Modelo que ya funcionó en esta sesión (se reutiliza).
-  String? _modeloElegido;
-
-  Map<String, String> get _cabeceras => {
-        'content-type': 'application/json',
-        'x-goog-api-key': config.apiKey,
-      };
-
-  Future<http.Response> _post(String modelo, String cuerpo) async {
-    try {
-      return await _http
-          .post(_url(modelo), headers: _cabeceras, body: cuerpo)
-          .timeout(const Duration(seconds: 60));
-    } on TimeoutException {
-      throw const IaException(
-          'La IA tardó demasiado en responder. Intenta de nuevo.');
-    } catch (_) {
-      throw const IaException(
-          'No se pudo conectar con la IA. Revisa tu conexión a internet.');
-    }
-  }
-
-  /// Pregunta a Google qué modelos de texto tiene disponibles esta clave y
-  /// elige el más adecuado (prefiere "flash" estables y recientes).
-  Future<String?> _buscarModelo({required String excluir}) async {
-    try {
-      final r = await _http
-          .get(
-            Uri.parse(
-                'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200'),
-            headers: _cabeceras,
-          )
-          .timeout(const Duration(seconds: 30));
-      if (r.statusCode != 200) return null;
-      final lista = (jsonDecode(utf8.decode(r.bodyBytes))['models'] as List?) ??
-          const [];
-
-      const excluidas = [
-        'tts', 'image', 'embedding', 'live', 'audio', 'robotics',
-        'computer-use', 'native', 'aqa', 'veo', 'imagen',
-      ];
-      final candidatos = <String>[];
-      for (final m in lista.whereType<Map>()) {
-        final nombre = (m['name'] ?? '').toString().replaceFirst('models/', '');
-        final metodos = (m['supportedGenerationMethods'] as List?) ?? const [];
-        if (!nombre.startsWith('gemini')) continue;
-        if (nombre == excluir) continue;
-        if (!metodos.contains('generateContent')) continue;
-        if (excluidas.any(nombre.contains)) continue;
-        candidatos.add(nombre);
-      }
-      if (candidatos.isEmpty) return null;
-
-      int puntaje(String n) {
-        var p = 0;
-        if (n.contains('flash')) p += 100;
-        if (n.contains('lite')) p -= 30;
-        if (n.contains('preview') || n.contains('exp')) p -= 50;
-        if (n.contains('latest')) p += 10;
-        return p;
-      }
-
-      // Mayor puntaje primero; a igualdad, el nombre más "alto" (versión mayor).
-      candidatos.sort((a, b) {
-        final c = puntaje(b).compareTo(puntaje(a));
-        return c != 0 ? c : b.compareTo(a);
-      });
-      return candidatos.first;
-    } catch (_) {
-      return null;
-    }
-  }
+  // Estado compartido por toda la app (varias pantallas crean su IaService).
+  static final Map<String, DateTime> _enEspera = {};
+  static final Set<String> _descartados = {};
+  static const _espera = Duration(minutes: 2);
 
   static const _sistema = '''
 Eres un analista financiero que ayuda a estudiantes y pequeños empresarios de Nicaragua (moneda: córdobas, C\$).
@@ -129,106 +69,68 @@ Reglas:
 - Esto es apoyo académico/orientativo, no asesoría financiera, contable o legal profesional.
 ''';
 
+  /// Orden en que se probarán los proveedores: primero los que no han
+  /// fallado hace poco; los que fallaron recientemente quedan al final
+  /// (así no se pierde tiempo en uno caído, pero tampoco se descarta).
+  List<IaProveedor> _ordenDeIntento() {
+    final ahora = DateTime.now();
+    final buenos = <IaProveedor>[];
+    final enEspera = <IaProveedor>[];
+    for (final p in _proveedores) {
+      if (_descartados.contains(p.config.id)) continue;
+      final hasta = _enEspera[p.config.id];
+      if (hasta != null && hasta.isAfter(ahora)) {
+        enEspera.add(p);
+      } else {
+        buenos.add(p);
+      }
+    }
+    final orden = [...buenos, ...enEspera];
+    // Si todos fueron descartados por clave inválida, se intenta igual
+    // (el usuario pudo haber corregido la clave).
+    return orden.isNotEmpty ? orden : List.of(_proveedores);
+  }
+
   /// Pide a la IA que interprete las cifras de [resumen].
   /// [enfoque] indica qué parte se analiza (p. ej. "Razones financieras").
   Future<String> interpretar({
     required String enfoque,
     required String resumen,
   }) async {
-    if (!config.configurada) {
+    if (_proveedores.isEmpty) {
       throw const IaException(
-          'La IA no está disponible: falta la clave de Gemini en ia/ia_secrets.dart.');
+          'La IA no está disponible: agrega al menos una clave en ia/ia_secrets.dart.');
     }
 
-    final cuerpo = jsonEncode({
-      'systemInstruction': {
-        'parts': [
-          {'text': _sistema},
-        ],
-      },
-      'contents': [
-        {
-          'role': 'user',
-          'parts': [
-            {'text': 'Interpreta este análisis: $enfoque.\n\nDatos:\n$resumen'},
-          ],
-        },
-      ],
-      'generationConfig': {
-        'maxOutputTokens': 4096,
-        'temperature': 0.4,
-      },
-    });
+    final usuario = 'Interpreta este análisis: $enfoque.\n\nDatos:\n$resumen';
+    final fallos = <String>[];
 
-    var modelo = _modeloElegido ?? config.modelo;
-    var r = await _post(modelo, cuerpo);
-
-    // Si el modelo no existe (Google los retira con el tiempo), se busca
-    // automáticamente uno disponible para esta clave y se reintenta una vez.
-    if (r.statusCode == 404) {
-      final alterno = await _buscarModelo(excluir: modelo);
-      if (alterno != null) {
-        modelo = alterno;
-        r = await _post(modelo, cuerpo);
-      }
-    }
-    if (r.statusCode == 200) _modeloElegido = modelo;
-
-    final texto = utf8.decode(r.bodyBytes);
-    if (r.statusCode != 200) {
-      throw IaException(_mensajeError(r.statusCode, texto));
-    }
-
-    try {
-      final json = jsonDecode(texto) as Map<String, dynamic>;
-      final candidatos = json['candidates'] as List?;
-      if (candidatos == null || candidatos.isEmpty) {
-        throw const IaException(
-            'La IA no devolvió respuesta (puede haber sido bloqueada por sus filtros).');
-      }
-      final partes = ((candidatos.first as Map)['content']?['parts'] as List?)
-              ?.whereType<Map>()
-              .map((p) => (p['text'] ?? '').toString()) ??
-          const <String>[];
-      final salida = partes.join('\n').trim();
-      if (salida.isEmpty) {
-        throw const IaException('La IA devolvió una respuesta vacía.');
-      }
-      return salida;
-    } on IaException {
-      rethrow;
-    } catch (_) {
-      throw const IaException('No se pudo leer la respuesta de la IA.');
-    }
-  }
-
-  static String _mensajeError(int status, String cuerpo) {
-    String? detalle;
-    try {
-      final j = jsonDecode(cuerpo) as Map<String, dynamic>;
-      detalle = (j['error'] as Map?)?['message'] as String?;
-    } catch (_) {}
-
-    final d = (detalle ?? '').toLowerCase();
-    switch (status) {
-      case 400:
-        if (d.contains('api key')) {
-          return 'La clave de la IA no es válida. Revisa ia/ia_secrets.dart.';
+    for (final p in _ordenDeIntento()) {
+      try {
+        final texto = await p.generar(sistema: _sistema, usuario: usuario);
+        _enEspera.remove(p.config.id);
+        _descartados.remove(p.config.id);
+        ultimoProveedor = p.nombre;
+        return texto;
+      } on IaFallo catch (e) {
+        if (e.definitivo) {
+          _descartados.add(p.config.id);
+        } else {
+          _enEspera[p.config.id] = DateTime.now().add(_espera);
         }
-        return 'La IA rechazó la solicitud${detalle != null ? ': $detalle' : '.'}';
-      case 401:
-      case 403:
-        return 'La clave de la IA no es válida o no tiene permiso. Revisa ia/ia_secrets.dart.';
-      case 404:
-        return 'El modelo de IA configurado no existe. Revisa IaConfig en ia_service.dart.';
-      case 429:
-        return 'Se alcanzó el límite gratuito de uso. Espera un momento e intenta de nuevo.';
-      case 500:
-      case 503:
-        return 'La IA está saturada en este momento. Intenta de nuevo en unos minutos.';
-      default:
-        return 'Error de la IA ($status)${detalle != null ? ': $detalle' : '.'}';
+        fallos.add('${p.nombre}: ${e.mensaje}');
+      } catch (_) {
+        _enEspera[p.config.id] = DateTime.now().add(_espera);
+        fallos.add('${p.nombre}: error inesperado.');
+      }
     }
+
+    if (fallos.length == 1) {
+      throw IaException('La IA falló. ${fallos.first}');
+    }
+    throw IaException(
+      'Ninguna IA pudo responder:\n${fallos.map((f) => '• $f').join('\n')}',
+    );
   }
 
   void cerrar() => _http.close();

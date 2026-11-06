@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/tema.dart';
 import 'screens/shell.dart';
 
 void main() => runApp(const GfoApp());
@@ -9,14 +10,16 @@ class GfoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'GFO App',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00695C)),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: modoTema,
+      builder: (context, modo, _) => MaterialApp(
+        title: 'GFO App',
+        debugShowCheckedModeBanner: false,
+        theme: temaClaro(),
+        darkTheme: temaOscuro(),
+        themeMode: modo,
+        home: const AppShell(),
       ),
-      home: const AppShell(),
     );
   }
 }

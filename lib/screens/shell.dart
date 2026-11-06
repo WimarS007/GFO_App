@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../core/indicadores_compartidos.dart';
 import '../core/modules.dart';
+import '../core/tema.dart';
 import '../estados/estados_controller.dart';
+import '../flujo/flujo_controller.dart';
 import '../ia/ia_service.dart';
+import '../inventario/inventario_controller.dart';
+import '../personal/personal_controller.dart';
+import '../presupuestos/presupuestos_controller.dart';
+import '../reportes/reporte_builder.dart';
+import 'acerca_de.dart';
 import 'analisis_financiero_screen.dart';
 import 'apalancamiento_screen.dart';
 import 'cvu_screen.dart';
@@ -13,6 +21,7 @@ import 'inventario_screen.dart';
 import 'planeacion_presupuestos_screen.dart';
 import 'presupuesto_personal_screen.dart';
 import 'proforma_screen.dart';
+import 'reportes_screen.dart';
 
 /// Contenedor principal: menú lateral (pantallas anchas) o drawer (móvil).
 class AppShell extends StatefulWidget {
@@ -28,11 +37,25 @@ class _AppShellState extends State<AppShell> {
 
   /// Datos compartidos entre módulos.
   final EstadosController _estados = EstadosController();
+  final IndicadoresCompartidos _indicadores = IndicadoresCompartidos();
+  final FlujoController _flujo = FlujoController();
+  late final PresupuestosController _presupuestos = PresupuestosController(
+    estados: _estados,
+    indicadores: _indicadores,
+  );
+  late final PersonalController _personal =
+      PersonalController(indicadores: _indicadores);
+  final InventarioController _inventario = InventarioController();
   final IaConfig _ia = const IaConfig();
 
   @override
   void dispose() {
     _estados.dispose();
+    _indicadores.dispose();
+    _flujo.dispose();
+    _presupuestos.dispose();
+    _personal.dispose();
+    _inventario.dispose();
     super.dispose();
   }
 
@@ -41,20 +64,38 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     // Mismo orden que la lista `modules`
     _pages = [
-      DashboardScreen(onOpen: _go),
+      DashboardScreen(
+        onOpen: _go,
+        estados: _estados,
+        indicadores: _indicadores,
+      ),
       EstadosFinancierosScreen(controller: _estados),
       AnalisisFinancieroScreen(estados: _estados, ia: _ia),
-      const CvuScreen(),
-      const ApalancamientoScreen(),
-      const FlujoEfectivoScreen(),
-      const PlaneacionPresupuestosScreen(),
-      const ProformaScreen(),
-      const PresupuestoPersonalScreen(),
-      const InventarioScreen(),
+      CvuScreen(estados: _estados, indicadores: _indicadores),
+      ApalancamientoScreen(estados: _estados, indicadores: _indicadores),
+      FlujoEfectivoScreen(estados: _estados, flujo: _flujo),
+      PlaneacionPresupuestosScreen(
+        estados: _estados,
+        presupuestos: _presupuestos,
+      ),
+      ProformaScreen(estados: _estados, indicadores: _indicadores),
+      PresupuestoPersonalScreen(personal: _personal),
+      InventarioScreen(inventario: _inventario),
+      ReportesScreen(
+        constructor: ConstructorReporte(
+          estados: _estados,
+          flujo: _flujo,
+          presupuestos: _presupuestos,
+          personal: _personal,
+          inventario: _inventario,
+        ),
+      ),
     ];
   }
 
   void _go(int i) => setState(() => _index = i);
+
+  void _acercaDe() => mostrarAcercaDe(context);
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +109,12 @@ class _AppShellState extends State<AppShell> {
             children: [
               SizedBox(
                 width: 280,
-                child: _SideMenu(selected: _index, onSelect: _go),
+                child: _SideMenu(
+                  selected: _index,
+                  onSelect: _go,
+                  onAbout: _acercaDe,
+                  wide: true,
+                ),
               ),
               const VerticalDivider(width: 1),
               Expanded(child: body),
@@ -78,13 +124,20 @@ class _AppShellState extends State<AppShell> {
       }
 
       return Scaffold(
-        appBar: AppBar(title: Text(modules[_index].title)),
+        appBar: AppBar(
+          title: Text(modules[_index].title),
+          actions: const [BotonTema()],
+        ),
         drawer: Drawer(
           child: _SideMenu(
             selected: _index,
             onSelect: (i) {
               Navigator.of(context).pop();
               _go(i);
+            },
+            onAbout: () {
+              Navigator.of(context).pop();
+              _acercaDe();
             },
           ),
         ),
@@ -95,10 +148,18 @@ class _AppShellState extends State<AppShell> {
 }
 
 class _SideMenu extends StatelessWidget {
-  const _SideMenu({required this.selected, required this.onSelect});
+  const _SideMenu({
+    required this.selected,
+    required this.onSelect,
+    required this.onAbout,
+    this.wide = false,
+  });
 
+  /// En pantallas anchas el botón de tema va en el menú (no hay AppBar).
+  final bool wide;
   final int selected;
   final ValueChanged<int> onSelect;
+  final VoidCallback onAbout;
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +187,7 @@ class _SideMenu extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (wide) const BotonTema(),
               ],
             ),
           ),
@@ -150,6 +212,18 @@ class _SideMenu extends StatelessWidget {
               onTap: () => onSelect(i),
             ),
           ],
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Divider(height: 1),
+          ),
+          ListTile(
+            dense: true,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Acerca de'),
+            onTap: onAbout,
+          ),
         ],
       ),
     );

@@ -177,4 +177,31 @@ class EstadosController extends ChangeNotifier {
   /// Utilidad neta = Utilidad antes de impuestos − Impuesto sobre la renta
   double utilidadNeta(Periodo p) =>
       utilidadAntesImpuestos(p) - totalGrupo(Grupo.impuestos, p);
+
+  // ----------------------------------- costos fijos / variables (C-V-U)
+
+  /// Costos de operación (costo de ventas + gastos de operación) según su comportamiento.
+  double _costosOperacion(Periodo p, Comportamiento tipo) => _cuentas
+      .where((c) =>
+          (c.grupo == Grupo.costoVentas || c.grupo == Grupo.gastosOperacion) &&
+          c.comportamiento == tipo)
+      .fold(0.0, (suma, c) => suma + c.valor(p));
+
+  double costosVariables(Periodo p) =>
+      _costosOperacion(p, Comportamiento.variable);
+
+  double costosFijos(Periodo p) => _costosOperacion(p, Comportamiento.fijo);
+
+  /// Margen de contribución = Ventas netas − Costos variables
+  double margenContribucion(Periodo p) => ventasNetas(p) - costosVariables(p);
+
+  /// Costos fijos + Otros gastos − Otros ingresos.
+  /// Así, Margen de contribución − este valor = UAII de los estados.
+  double costosFijosParaUaii(Periodo p) =>
+      costosFijos(p) +
+      totalGrupo(Grupo.otrosGastos, p) -
+      totalGrupo(Grupo.otrosIngresos, p);
+
+  double gastosFinancieros(Periodo p) =>
+      totalGrupo(Grupo.gastosFinancieros, p);
 }
