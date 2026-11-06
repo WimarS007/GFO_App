@@ -6,6 +6,7 @@ import '../core/tema.dart';
 import '../estados/estados_controller.dart';
 import '../flujo/flujo_controller.dart';
 import '../ia/ia_service.dart';
+import '../inventario/inventario_controller.dart';
 import '../personal/personal_controller.dart';
 import '../presupuestos/presupuestos_controller.dart';
 import 'acerca_de.dart';
@@ -42,6 +43,7 @@ class _AppShellState extends State<AppShell> {
   );
   late final PersonalController _personal =
       PersonalController(indicadores: _indicadores);
+  final InventarioController _inventario = InventarioController();
   final IaConfig _ia = const IaConfig();
 
   @override
@@ -51,6 +53,7 @@ class _AppShellState extends State<AppShell> {
     _flujo.dispose();
     _presupuestos.dispose();
     _personal.dispose();
+    _inventario.dispose();
     super.dispose();
   }
 
@@ -75,7 +78,7 @@ class _AppShellState extends State<AppShell> {
       ),
       ProformaScreen(estados: _estados, indicadores: _indicadores),
       PresupuestoPersonalScreen(personal: _personal),
-      const InventarioScreen(),
+      InventarioScreen(inventario: _inventario),
     ];
   }
 
