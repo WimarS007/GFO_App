@@ -83,15 +83,21 @@ class DashboardScreen extends StatelessWidget {
                     value: _fmt(indicadores.gat),
                     detail: 'Módulo Apalancamiento',
                   ),
-                  const ResultTile(
+                  ResultTile(
                     label: 'Saldo de efectivo proyectado',
                     unit: 'C\$',
-                    detail: 'Módulo pendiente',
+                    value: indicadores.saldoEfectivoProyectado == null
+                        ? '—'
+                        : formatoMonto(indicadores.saldoEfectivoProyectado!),
+                    detail: 'Planeación y presupuestos (T4)',
                   ),
-                  const ResultTile(
+                  ResultTile(
                     label: 'Saldo disponible personal',
                     unit: 'C\$',
-                    detail: 'Módulo pendiente',
+                    value: indicadores.saldoPersonal == null
+                        ? '—'
+                        : formatoMonto(indicadores.saldoPersonal!),
+                    detail: 'Presupuesto personal',
                   ),
                   const ResultTile(
                     label: 'Valor del inventario',

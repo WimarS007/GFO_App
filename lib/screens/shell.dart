@@ -6,6 +6,8 @@ import '../core/tema.dart';
 import '../estados/estados_controller.dart';
 import '../flujo/flujo_controller.dart';
 import '../ia/ia_service.dart';
+import '../personal/personal_controller.dart';
+import '../presupuestos/presupuestos_controller.dart';
 import 'acerca_de.dart';
 import 'analisis_financiero_screen.dart';
 import 'apalancamiento_screen.dart';
@@ -34,6 +36,12 @@ class _AppShellState extends State<AppShell> {
   final EstadosController _estados = EstadosController();
   final IndicadoresCompartidos _indicadores = IndicadoresCompartidos();
   final FlujoController _flujo = FlujoController();
+  late final PresupuestosController _presupuestos = PresupuestosController(
+    estados: _estados,
+    indicadores: _indicadores,
+  );
+  late final PersonalController _personal =
+      PersonalController(indicadores: _indicadores);
   final IaConfig _ia = const IaConfig();
 
   @override
@@ -41,6 +49,8 @@ class _AppShellState extends State<AppShell> {
     _estados.dispose();
     _indicadores.dispose();
     _flujo.dispose();
+    _presupuestos.dispose();
+    _personal.dispose();
     super.dispose();
   }
 
@@ -59,9 +69,12 @@ class _AppShellState extends State<AppShell> {
       CvuScreen(estados: _estados, indicadores: _indicadores),
       ApalancamientoScreen(estados: _estados, indicadores: _indicadores),
       FlujoEfectivoScreen(estados: _estados, flujo: _flujo),
-      const PlaneacionPresupuestosScreen(),
-      const ProformaScreen(),
-      const PresupuestoPersonalScreen(),
+      PlaneacionPresupuestosScreen(
+        estados: _estados,
+        presupuestos: _presupuestos,
+      ),
+      ProformaScreen(estados: _estados, indicadores: _indicadores),
+      PresupuestoPersonalScreen(personal: _personal),
       const InventarioScreen(),
     ];
   }

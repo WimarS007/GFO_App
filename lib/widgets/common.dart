@@ -185,15 +185,21 @@ class TextFieldBox extends StatelessWidget {
     required this.label,
     this.hint,
     this.maxLines = 1,
+    this.controller,
+    this.onChanged,
   });
 
   final String label;
   final String? hint;
   final int maxLines;
+  final TextEditingController? controller;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
+      onChanged: onChanged,
       maxLines: maxLines,
       decoration: InputDecoration(
         labelText: label,
