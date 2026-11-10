@@ -182,12 +182,13 @@ class _PlaneacionPresupuestosScreenState
   // ---------------------------------------------------------------- supuestos
 
   Widget _campo(Campo c, String etiqueta,
-      {String? prefijo, String? sufijo, String? pista}) {
+      {String? prefijo, String? sufijo, String? pista, String? ayuda}) {
     return NumberField(
       label: etiqueta,
       prefix: prefijo,
       suffix: sufijo,
       hint: pista,
+      helper: ayuda,
       controller: _campos[c],
       onChanged: (t) => widget.presupuestos.setValor(c, parseMonto(t) ?? 0),
     );
@@ -237,7 +238,8 @@ class _PlaneacionPresupuestosScreenState
               _campo(Campo.pctComprasContado, 'Compras al contado', sufijo: '%'),
               _campo(Campo.pctInventarioFinal,
                   'Inventario final deseado',
-                  sufijo: '% de las ventas del trimestre siguiente'),
+                  sufijo: '%',
+                  ayuda: 'De las unidades que se venderán el trimestre siguiente'),
               _campo(Campo.costoUnitario, 'Costo unitario de compra',
                   prefijo: 'C\$ '),
               _campo(Campo.cajaMinima, 'Saldo mínimo de caja', prefijo: 'C\$ '),

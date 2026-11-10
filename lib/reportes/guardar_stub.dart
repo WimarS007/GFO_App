@@ -1,9 +1,8 @@
 import 'dart:typed_data';
 
-/// Plataformas sin dart:io (web): no hay nada más que hacer.
-Future<String> asegurarEscrito(
-  String ruta,
-  Uint8List bytes,
+Future<String?> guardarPlataforma(
+  String nombre,
   String extension,
+  Uint8List bytes,
 ) async =>
-    ruta;
+    throw UnsupportedError('Esta plataforma no puede guardar archivos.');
