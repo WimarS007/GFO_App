@@ -150,6 +150,7 @@ class NumberField extends StatelessWidget {
     this.prefix,
     this.suffix,
     this.hint,
+    this.helper,
     this.controller,
     this.onChanged,
   });
@@ -158,6 +159,9 @@ class NumberField extends StatelessWidget {
   final String? prefix;
   final String? suffix;
   final String? hint;
+
+  /// Texto de ayuda bajo la casilla (para explicaciones largas, en vez del sufijo).
+  final String? helper;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
 
@@ -173,6 +177,8 @@ class NumberField extends StatelessWidget {
         prefixText: prefix,
         suffixText: suffix,
         hintText: hint,
+        helperText: helper,
+        helperMaxLines: 2,
         border: const OutlineInputBorder(),
       ),
     );
